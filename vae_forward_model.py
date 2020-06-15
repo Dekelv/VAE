@@ -91,11 +91,11 @@ class VariationalAutoencoder(object):
 
 
     def _slice_input(self, input_layer, size_mod):
-        slices=[]
-        count =0
+        slices = []
+        count = 0
         for i in range(len(self.network_architecture[size_mod])):
             new_slice = tf.slice(input_layer, [0,count], [self.batch_size,self.network_architecture[size_mod][i]]) # tf.slice(layer_2, [0,200], [105,100])
-            count+=self.network_architecture[size_mod][i]
+            count += self.network_architecture[size_mod][i]
             slices.append(new_slice)
         return slices
 
@@ -103,13 +103,25 @@ class VariationalAutoencoder(object):
         with tf.name_scope(name):
             self.layers[name]=[input_layer]
             for i in range(len(self.network_architecture[name])):
+                ##print("WHEN CREATING THE PARTIAL LAYER")
+                ##print(name)
+                ##print(self.layers[name][-1])
+                ##print(self.layers[name][-1].get_shape())
+                ##print(self.layers[name][-1].get_shape()[1])
+
                 h=tf.Variable(xavier_init(int(self.layers[name][-1].get_shape()[1]), self.network_architecture[name][i]))
                 b= tf.Variable(tf.zeros([self.network_architecture[name][i]], dtype=tf.float64))
+                ##print(h)
+                ##print(b)
+                ##b = bias
+                ## h = weight
                 layer = self.transfer_fct(tf.add(tf.matmul(self.layers[name][-1],    h), b))
                 self.layers[name].append(layer)
             
 
     def _create_variational_network(self, input_layer, latent_size):
+        ##print("!!!!creating the variational network!!!!!")
+        ##print(input_layer.get_shape())
         input_layer_size= int(input_layer.get_shape()[1])
         
         h_mean= tf.Variable(xavier_init(input_layer_size, latent_size))
@@ -143,11 +155,13 @@ class VariationalAutoencoder(object):
                 
     def _create_network(self):
         # Initialize autoencode network weights and biases
+        ##print("x_noiseless shape!!:")
+        ##print(self.x_noiseless.shape)
         self.x_noiseless_sliced=self._slice_input(self.x_noiseless, 'size_slices_output')
-        slices=self._slice_input(self.x, 'size_slices_input')
+        slices = self._slice_input(self.x, 'size_slices_input')
         self._create_modalities_network(['mod0','mod1','mod2','mod3','mod4'], slices)
 
-        self.output_mod = tf.concat([self.layers['mod0'][-1],self.layers['mod1'][-1],self.layers['mod2'][-1],self.layers['mod3'][-1],self.layers['mod4'][-1]],1) 
+        self.output_mod = tf.concat([self.layers['mod0'][-1],self.layers['mod1'][-1],self.layers['mod2'][-1],self.layers['mod3'][-1],self.layers['mod4'][-1]],1)
         self.layers['concat']=[self.output_mod]
         
         #self._create_partial_network('enc_shared',self.x)
@@ -195,9 +209,7 @@ class VariationalAutoencoder(object):
                         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.cost) 
 
                         self.m_reconstr_loss = self.reconstr_loss
-                        self.m_latent_loss = tf.reduce_mean(self.latent_loss)         
-
-
+                        self.m_latent_loss = tf.reduce_mean(self.latent_loss)
                         
 
     def print_layers_size(self):
@@ -212,7 +224,9 @@ class VariationalAutoencoder(object):
         
         Return cost of mini-batch.
         """
-
+        """
+        What is the x_reconstr
+        """
         opt, cost, recon, latent, x_rec, alpha = sess.run((self.optimizer, self.cost, self.m_reconstr_loss,self.m_latent_loss, self.x_reconstr, self.alpha), 
             feed_dict={self.x: X, self.x_noiseless: X_noiseless, self.n_epoch: epoch})
         return cost, recon, latent, x_rec, alpha
@@ -273,6 +287,9 @@ def train_whole(sess,vae, input_data, learning_rate=0.0001, batch_size=100, trai
             batch_xs   = np.asarray([item[:28]   for item in batch_xs_augmented])#np.asarray([item[:18]   for item in batch_xs_augmented])
             batch_xs_noiseless   = np.asarray([item[28:]   for item in batch_xs_augmented])#np.asarray([item[:18]   for item in batch_xs_augmented])
                         # batch_xs_noiseless_J   = np.asarray([item[8:12]   for item in batch_xs_noiseless])
+            ##print("------->batch example")
+            ##print(batch_xs.shape)
+            ##print(batch_xs)
 
             input_idx = [4,5,6,7, 12,13,14,15, 17, 19, 24,25,26,27]
 
@@ -333,11 +350,12 @@ if __name__ == '__main__':
 
     
     learning_rate = 0.00005
-    batch_size = 1000
+    batch_size = 1
 
     # Train Network
     print('Train net')
 
+    ## probably some sort of manpulatable model run
     sess = tf.InteractiveSession()
 
     vae_mode=True
@@ -345,10 +363,17 @@ if __name__ == '__main__':
 
     reload_modalities=False
     reload_shared=False
-        
+
+
+
+    ##Network params consist of dimensionality and layers
     vae = VariationalAutoencoder(sess,network_param(),  learning_rate=learning_rate,  batch_size=batch_size, vae_mode=vae_mode, vae_mode_modalities=vae_mode_modalities)
     vae.print_layers_size()
-    
+
+    print("the input training data: ")
+    print(X_augm_train.shape)
+    print(X_augm_train)
+
     train_whole(sess,vae, X_augm_train, training_epochs=80000,batch_size=batch_size)
 
     

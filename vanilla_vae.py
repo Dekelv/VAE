@@ -291,7 +291,7 @@ if __name__ == '__main__':
     # Train Network
     print('Train net')
 
-    sess = tf.InteractiveSession()
+    sess = tf.compat.v1.InteractiveSession()
 
     network_architecture = \
     dict(n_hidden_recog_1=100, # 1st layer encoder neurons

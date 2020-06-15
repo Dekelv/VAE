@@ -19,6 +19,7 @@ print("Loading dataset...")
 a = scipy.io.loadmat("matlab/database/final_database_train.mat")
 X_init = 1*a["final_database_train"]
 X_augm_train = X_init[:1845,:] #np.append(X_train_all,X_train_no_mc,axis=0)
+print("The shape right heeeeere")
 print(X_augm_train.shape)
 n_samples = X_augm_train.shape[0]
 ##########################################################################################

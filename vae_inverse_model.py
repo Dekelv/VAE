@@ -255,7 +255,7 @@ def shuffle_data(x):
 
 
 def train_whole(sess,vae, input_data, learning_rate=0.0001, batch_size=100, training_epochs=10, display_step=1, vae_mode=True, vae_mode_modalities=True):
-    
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!this is also being ruuuuuuun")
     # Write logs to Tensorboard
     summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
 
