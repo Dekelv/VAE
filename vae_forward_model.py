@@ -14,12 +14,12 @@ import matplotlib.pyplot as plt
 np.random.seed(0)
 tf.set_random_seed(0)
 
-logs_path = './logs/mvae_forward_model'
+logs_path = '.././logs/mvae_forward_model'
 
 
 print("Loading dataset...")
 
-a = scipy.io.loadmat("matlab/database/final_database_train.mat")
+a = scipy.io.loadmat("../matlab/database/final_database_train.mat")
 X_init = 1*a["final_database_train"]
 X_augm_train = X_init #np.append(X_train_all,X_train_no_mc,axis=0)
 print(X_augm_train.shape)
@@ -159,9 +159,9 @@ class VariationalAutoencoder(object):
         ##print(self.x_noiseless.shape)
         self.x_noiseless_sliced=self._slice_input(self.x_noiseless, 'size_slices_output')
         slices = self._slice_input(self.x, 'size_slices_input')
-        self._create_modalities_network(['mod0','mod1','mod2','mod3','mod4'], slices)
+        self._create_modalities_network(['mod0','mod1','mod2','mod3'], slices)
 
-        self.output_mod = tf.concat([self.layers['mod0'][-1],self.layers['mod1'][-1],self.layers['mod2'][-1],self.layers['mod3'][-1],self.layers['mod4'][-1]],1)
+        self.output_mod = tf.concat([self.layers['mod0'][-1],self.layers['mod1'][-1],self.layers['mod2'][-1],self.layers['mod3'][-1]],1)
         self.layers['concat']=[self.output_mod]
         
         #self._create_partial_network('enc_shared',self.x)
@@ -177,9 +177,10 @@ class VariationalAutoencoder(object):
         self._create_partial_network('dec_shared',self.z)
 
         slices_shared=self._slice_input(self.layers['dec_shared'][-1], 'size_slices_shared')
-        self._create_modalities_network(['mod0_2','mod1_2','mod2_2','mod3_2','mod4_2'], slices_shared)
+        self._create_modalities_network(['mod0_2','mod1_2','mod2_2','mod3_2'], slices_shared)
 
-        self.x_reconstr, self.x_log_sigma_sq = self._create_mod_variational_network(['mod0_2','mod1_2','mod2_2','mod3_2'],'size_slices_output')
+        ## could be that the slices output does have to include actions :DEKEL
+        self.x_reconstr, self.x_log_sigma_sq = self._create_mod_variational_network(['mod0_2','mod1_2','mod2_2'],'size_slices_output')
                 
 
                 #self.output_mod_shared = tf.concat([self.layers['mod0_2'][-1],self.layers['mod1_2'][-1],self.layers['mod2_2'][-1],self.layers['mod3_2'][-1],self.layers['mod4_2'][-1]],1)
@@ -200,7 +201,7 @@ class VariationalAutoencoder(object):
                                                 + 0.5 * self.n_z/2 * np.log(2*math.pi) )/self.network_architecture['size_slices_output'][i]
                                 self.tmp_costs.append(reconstr_loss)
                                 
-                        self.reconstr_loss = tf.reduce_mean(self.tmp_costs[0]+ self.tmp_costs[1] + self.tmp_costs[2] + self.tmp_costs[3] )
+                        self.reconstr_loss = tf.reduce_mean(self.tmp_costs[0]+ self.tmp_costs[1] + self.tmp_costs[2] )
 
                         self.latent_loss = -0.5 * tf.reduce_sum(1 + self.z_log_sigma_sq  - tf.square(self.z_mean)  - tf.exp(self.z_log_sigma_sq), 1)
 
@@ -227,7 +228,7 @@ class VariationalAutoencoder(object):
         """
         What is the x_reconstr
         """
-        opt, cost, recon, latent, x_rec, alpha = sess.run((self.optimizer, self.cost, self.m_reconstr_loss,self.m_latent_loss, self.x_reconstr, self.alpha), 
+        opt, cost, recon, latent, x_rec, alpha = sess.run((self.optimizer, self.cost, self.m_reconstr_loss,self.m_latent_loss, self.x_reconstr, self.alpha),
             feed_dict={self.x: X, self.x_noiseless: X_noiseless, self.n_epoch: epoch})
         return cost, recon, latent, x_rec, alpha
 
@@ -263,7 +264,7 @@ def shuffle_data(x):
 
 
 
-def train_whole(sess,vae, input_data, learning_rate=0.0001, batch_size=100, training_epochs=10, display_step=1, vae_mode=True, vae_mode_modalities=True):
+def train_whole(vae, input_data, learning_rate=0.0001, batch_size=100, training_epochs=10, display_step=1, vae_mode=True, vae_mode_modalities=True):
     
     # Write logs to Tensorboard
     summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
@@ -314,49 +315,74 @@ def train_whole(sess,vae, input_data, learning_rate=0.0001, batch_size=100, trai
                         
         param_id= sys.argv[1:][0]
     save_path = vae.saver.save(vae.sess, "./models/vae_fm_"+param_id+".ckpt")
-    
 
 
+def train_robot(input_data, learning_rate=0.0001, batch_size=100, display_step=1,
+                vae_mode=True, vae_mode_modalities=True, epoch=1):
+    # Write logs to Tensorboard
+    summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
+    input_noisy = input
+
+    # Fit training using batch data
+    cost, recon, latent, x_rec, alpha = vae.partial_fit(sess, input, input_noisy, epoch)
+    avg_cost += cost / n_samples * batch_size
+    avg_recon += recon / n_samples * batch_size
+    avg_latent += latent / n_samples * batch_size
+
+    # Display logs per epoch step
+    if epoch % display_step == 0:
+        print("Epoch: %04d, Cost= %04f, Recon= %04f, Latent= %04f, alpha= %04f" % \
+              (epoch, avg_cost, avg_recon, avg_latent, alpha))
+
+    # if epoch % display_step*5 == 0:
+    # save_path = vae.saver.save(vae.sess, "./models/mvae4j4v_tmp_whole_complete.ckpt")
+
+    param_id = sys.argv[1:][0]
+    save_path = vae.saver.save(vae.sess, "./models/vae_fm_" + param_id + ".ckpt")
+
+
+####HERE THE NETWORK PARAMS HAVE TO BE CHANGED
 def network_param():
         param_id= int(sys.argv[1:][0])
         print('params id: ', param_id)
 
         network_architecture = \
-           {'n_input':14,\
-            'n_z':14,\
-            'size_slices_input':[4, 4, 1, 1, 4],\
-            'size_slices_output':[4, 4, 1, 1],\
+           {'n_input':13,\
+            'n_z':13,\
+            'size_slices_input':[3, 5, 2, 3],\
+            'size_slices_output':[3, 5, 2],\
             # BECAREFUL The number of slice should be equal to the number of _mod_ network
-            'size_slices_shared':[20, 20, 5, 5, 20],\
+            'size_slices_shared':[10, 10, 10, 5],\
             # BECAREFUL The sum of the dimensions of the slices, should be equal to the last dec_shared
-            'mod0':[40,20],\
-            'mod1':[40,20],\
-            'mod2':[10,5],\
+            'mod0':[20,10],\
+            'mod1':[20,10],\
+            'mod2':[10,10],\
             'mod3':[10,5],\
-            'mod4':[40,10],\
-            'mod0_2':[40,8],\
-            'mod1_2':[40,8],\
+            'mod0_2':[20,8],\
+            'mod1_2':[20,8],\
             'mod2_2':[10,2],\
             'mod3_2':[10,2],\
-            'mod4_2':[40,8],\
-            'enc_shared':[100],\
-            'dec_shared':[100,70]}
+            'enc_shared':[50],\
+            'dec_shared':[50,35]}
                 
         return network_architecture
         
+## probably some sort of manpulatable model run
+sess = tf.InteractiveSession()
+vae = None
+avg_cost = 0.
+avg_recon = 0.
+avg_latent = 0.
 
-if __name__ == '__main__':
-
-
-    
+##if __name__ == '__main__':
+def initialize():
     learning_rate = 0.00005
     batch_size = 1
 
     # Train Network
     print('Train net')
 
-    ## probably some sort of manpulatable model run
-    sess = tf.InteractiveSession()
+
 
     vae_mode=True
     vae_mode_modalities=False
@@ -364,16 +390,23 @@ if __name__ == '__main__':
     reload_modalities=False
     reload_shared=False
 
+    global avg_cost
+    global avg_recon
+    global avg_latent
+    avg_cost = 0.
+    avg_recon = 0.
+    avg_latent = 0.
 
 
     ##Network params consist of dimensionality and layers
-    vae = VariationalAutoencoder(sess,network_param(),  learning_rate=learning_rate,  batch_size=batch_size, vae_mode=vae_mode, vae_mode_modalities=vae_mode_modalities)
+    global vae
+    vae = VariationalAutoencoder(sess, network_param(),  learning_rate=learning_rate,  batch_size=batch_size, vae_mode=vae_mode, vae_mode_modalities=vae_mode_modalities)
     vae.print_layers_size()
 
     print("the input training data: ")
     print(X_augm_train.shape)
-    print(X_augm_train)
+    print(type(X_augm_train))
 
-    train_whole(sess,vae, X_augm_train, training_epochs=80000,batch_size=batch_size)
+    #train_whole(sess,vae, X_augm_train, training_epochs=80000,batch_size=batch_size)
 
     

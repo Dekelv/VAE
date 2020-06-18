@@ -3,6 +3,7 @@ from gym import utils
 from gym.envs.robotics import fetch_env
 import gym
 
+
 # Ensure we get the path separator correct on windows
 MODEL_XML_PATH = os.path.join('fetch', 'reach.xml')
 
